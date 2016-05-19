@@ -1,6 +1,5 @@
 (function () {
 
-var isActive = false;
 var popupEl = null;
 
 /**
@@ -21,19 +20,82 @@ function convertNumberToWords (num) {
   return str;
 }
 
-function handleMouseMove (event) {
-  if (! isActive || ! popupEl) {
-    return;
+/**
+ * Get selected text.
+ * @returns {string}
+ */
+function getSelectionText() {
+  var text = "";
+  if (window.getSelection) {
+    text = window.getSelection().toString();
+  } else if (document.selection && document.selection.type != "Control") {
+    text = document.selection.createRange().text;
   }
-  var x = event.clientX;
-  var y = event.clientY;
-  var mouseOverEl = document.elementFromPoint(x, y);
-  var elementNumber = mouseOverEl.innerText.replace( /^\D+/g, '');
-  var number = parseInt(elementNumber, 10);
+  return text;
+}
+
+/**
+ * Get selection coords.
+ * @return {{x: <Number>, y: <Number>}}
+ */
+function getSelectionCoords() {
+    var sel = document.selection, range, rect;
+    var x = 0, y = 0;
+    if (sel) {
+        if (sel.type != "Control") {
+            range = sel.createRange();
+            range.collapse(true);
+            x = range.boundingLeft;
+            y = range.boundingTop;
+        }
+    } else if (window.getSelection) {
+        sel = window.getSelection();
+        if (sel.rangeCount) {
+            range = sel.getRangeAt(0).cloneRange();
+            if (range.getClientRects) {
+                range.collapse(true);
+                if (range.getClientRects().length>0){
+                    rect = range.getClientRects()[0];
+                    x = rect.left;
+                    y = rect.top;
+                }
+            }
+            // Fall back to inserting a temporary element
+            if (x == 0 && y == 0) {
+                var span = document.createElement("span");
+                if (span.getClientRects) {
+                    // Ensure span has dimensions and position by
+                    // adding a zero-width space character
+                    span.appendChild( document.createTextNode("\u200b") );
+                    range.insertNode(span);
+                    rect = span.getClientRects()[0];
+                    x = rect.left;
+                    y = rect.top;
+                    var spanParent = span.parentNode;
+                    spanParent.removeChild(span);
+                    // Glue any broken text nodes back together
+                    spanParent.normalize();
+                }
+            }
+        }
+    }
+    return { x: x, y: y };
+}
+
+/**
+ * Handle mouseup event.
+ * @param event
+ */
+function handleMouseUp (event) {
+  var selectedText = window.getSelection().toString();
+  var selectedNumber = selectedText.replace( /^\D+/g, '');
+  var number = parseInt(selectedNumber, 10);
   if (number) {
-    popupEl.style.top = (y - 5) + 'px';
-    popupEl.style.left = (x + 25) + 'px';
-    popupEl.style.display = '';
+    var coords = getSelectionCoords();
+    var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    popupEl.style.top = ((coords.y + scrollTop) - 40) + 'px';
+    popupEl.style.left = (coords.x) + 'px';
+    popupEl.style.display = 'block';
     popupEl.innerHTML = convertNumberToWords(number);
   } else {
     popupEl.style.display = 'none';
@@ -45,7 +107,7 @@ function handleMouseMove (event) {
  */
 function run () {
   popupEl = document.createElement('DIV');
-  popupEl.style.position = 'fixed';
+  popupEl.style.position = 'absolute';
   popupEl.style.top = '0';
   popupEl.style.left = '0';
   popupEl.style.padding = '.35em .5em';
@@ -53,21 +115,14 @@ function run () {
   popupEl.style.color = '#fff';
   popupEl.style.fontFamily = 'sans-serif';
   popupEl.style.zIndex = '1000000';
-  popupEl.style.display = isActive ? 'block': 'none';
+  popupEl.style.display = 'none';
   popupEl.style.whiteSpace = 'nowrap';
   popupEl.style.borderRadius = '3px';
   document.getElementsByTagName('BODY')[0].appendChild(popupEl);
-  window.addEventListener('mousemove', handleMouseMove, false);
+  // window.addEventListener('mousemove', handleMouseMove, false);
+  window.addEventListener('mouseup', handleMouseUp, false);
 }
 
-function askBackgroundScriptAboutState () {
-  chrome.extension.sendRequest({}, function(response) {
-    isActive = response.isActive;
-    run();
-  });
-}
-
-askBackgroundScriptAboutState();
-window.__numberToTextChromeExtensionSskBackgroundScriptAboutState = askBackgroundScriptAboutState;
+run();
 
 })();
