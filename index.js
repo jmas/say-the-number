@@ -119,7 +119,6 @@ function run () {
   popupEl.style.whiteSpace = 'nowrap';
   popupEl.style.borderRadius = '3px';
   document.getElementsByTagName('BODY')[0].appendChild(popupEl);
-  // window.addEventListener('mousemove', handleMouseMove, false);
   window.addEventListener('mouseup', handleMouseUp, false);
 }
 
